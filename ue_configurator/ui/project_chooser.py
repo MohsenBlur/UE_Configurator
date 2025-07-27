@@ -9,8 +9,9 @@ from PySide6.QtWidgets import (
     QListWidget,
     QPushButton,
     QFileDialog,
-    QMessageBox,
 )
+
+from .main_window import MainWindow
 
 RECENT_FILE = Path.home() / ".ue5_config_assistant" / "recent.json"
 
@@ -63,5 +64,9 @@ class ProjectChooser(QWidget):
     def _select(self, path: str) -> None:
         projects = [path] + [self.recent.item(i).text() for i in range(self.recent.count()) if self.recent.item(i).text() != path]
         save_recent(projects[:10])
-        QMessageBox.information(self, "Project Selected", f"Selected project: {path}\n(Next steps not implemented)")
+
+        cache = Path.home() / ".ue5_config_assistant" / "cvar_cache.json"
+        self.main_window = MainWindow(cache)  # type: ignore[attr-defined]
+        self.main_window.show()
+        self.close()
 

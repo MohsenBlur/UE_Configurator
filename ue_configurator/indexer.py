@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import json
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, List, Dict
 
 import rich.progress
 
@@ -31,6 +31,15 @@ def index_headers(root: Path) -> list[dict[str, str]]:
 def build_cache(engine_root: Path, cache_file: Path) -> None:
     data = index_headers(engine_root)
     cache_file.write_text(json.dumps(data, indent=2))
+
+
+def load_cache(cache_file: Path) -> List[Dict[str, str]]:
+    if cache_file.exists():
+        try:
+            return json.loads(cache_file.read_text())
+        except Exception:
+            pass
+    return []
 
 
 def main() -> None:
