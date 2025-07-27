@@ -66,7 +66,8 @@ class ProjectChooser(QWidget):
         save_recent(projects[:10])
 
         cache = Path.home() / ".ue5_config_assistant" / "cvar_cache.json"
-        self.main_window = MainWindow(cache)  # type: ignore[attr-defined]
+        project_dir = Path(path).parent
+        self.main_window = MainWindow(cache, project_dir)  # type: ignore[attr-defined]
         self.main_window.show()
         self.close()
 
