@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from .main_window import MainWindow
+from ..settings import load_settings, save_settings
 
 RECENT_FILE = Path.home() / ".ue5_config_assistant" / "recent.json"
 
@@ -37,6 +38,8 @@ class ProjectChooser(QWidget):
         super().__init__()
         self.setWindowTitle("UE Config Assistant - Choose Project")
 
+        settings = load_settings()
+
         self.layout = QVBoxLayout(self)
         self.recent = QListWidget()
         self.browse_btn = QPushButton("Browse for .uproject")
@@ -48,6 +51,9 @@ class ProjectChooser(QWidget):
         self.recent.itemDoubleClicked.connect(self.open_recent)
 
         self._load()
+
+        if geo := settings.get("chooser_geometry"):
+            self.restoreGeometry(bytes.fromhex(geo))
 
     def _load(self) -> None:
         for proj in load_recent():
@@ -66,7 +72,9 @@ class ProjectChooser(QWidget):
         save_recent(projects[:10])
 
         cache = Path.home() / ".ue5_config_assistant" / "cvar_cache.json"
-        self.main_window = MainWindow(cache)  # type: ignore[attr-defined]
+        project_dir = Path(path).parent
+        self.main_window = MainWindow(cache, project_dir)  # type: ignore[attr-defined]
         self.main_window.show()
+        save_settings({"chooser_geometry": self.saveGeometry().data().hex()})
         self.close()
 
