@@ -5,12 +5,19 @@ from __future__ import annotations
 import re
 import json
 from pathlib import Path
-from typing import Iterable, List, Dict
+from typing import Iterable, List, Dict, Tuple
 
 import rich.progress
 
-REGISTER = re.compile(r'IConsoleVariable::Register[^\"]*\"(?P<name>[A-Za-z0-9_.]+)\".*?\"(?P<desc>[^\"]+)\"[^;]*;')
-UE_CVAR = re.compile(r'UE_CVAR_(?:INTEGER|FLOAT|STRING)\s*\(\s*\"(?P<name>[^\"]+)\"\s*,.*?\"(?P<desc>[^\"]+)\"')
+REGISTER = re.compile(
+    r'IConsoleVariable::Register\s*\(\s*"(?P<name>[A-Za-z0-9_.]+)"\s*,\s*(?P<default>[^,]+),\s*"(?P<desc>[^"]+)"',
+)
+UE_CVAR = re.compile(
+    r'UE_CVAR_(?:INTEGER|FLOAT|STRING)\s*\(\s*"(?P<name>[^"]+)"\s*,\s*(?P<default>[^,]+),\s*"(?P<desc>[^"]+)"',
+)
+
+COMMENT_CATEGORY = re.compile(r"Category:\s*(?P<val>.+)")
+COMMENT_RANGE = re.compile(r"Range:\s*(?P<val>.+)")
 
 
 def iter_headers(root: Path) -> Iterable[Path]:
@@ -18,13 +25,43 @@ def iter_headers(root: Path) -> Iterable[Path]:
         yield path
 
 
+def _parse_comment_metadata(lines: List[str], idx: int) -> Tuple[str | None, str | None]:
+    """Parse category and range from comment lines above ``idx``."""
+    category: str | None = None
+    valid_range: str | None = None
+    for j in range(idx - 1, max(-1, idx - 4), -1):
+        line = lines[j].strip()
+        if not line.startswith("//"):
+            break
+        comment = line[2:].strip()
+        m = COMMENT_CATEGORY.search(comment)
+        if m:
+            category = m.group("val").strip()
+        m = COMMENT_RANGE.search(comment)
+        if m:
+            valid_range = m.group("val").strip()
+    return category, valid_range
+
+
 def index_headers(root: Path) -> list[dict[str, str]]:
     results = []
     for header in iter_headers(root):
         text = header.read_text(errors="ignore")
-        for pattern in (REGISTER, UE_CVAR):
-            for match in pattern.finditer(text):
-                results.append({"name": match.group("name"), "description": match.group("desc"), "file": str(header)})
+        lines = text.splitlines()
+        for idx, line in enumerate(lines):
+            match = REGISTER.search(line) or UE_CVAR.search(line)
+            if match:
+                category, rng = _parse_comment_metadata(lines, idx)
+                results.append(
+                    {
+                        "name": match.group("name"),
+                        "description": match.group("desc"),
+                        "default": match.group("default").strip(),
+                        "category": category or "",
+                        "range": rng or "",
+                        "file": str(header),
+                    }
+                )
     return results
 
 
