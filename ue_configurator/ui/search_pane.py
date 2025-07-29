@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QLineEdit,
+    QComboBox,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
@@ -24,18 +25,23 @@ class SearchPane(QWidget):
         self.setWindowTitle("UE Config Assistant - Search")
 
         self.search_box = QLineEdit()
+        self.category_box = QComboBox()
+        self.category_box.addItem("All")
         self.table = QTableWidget(0, 3)
         self.table.setHorizontalHeaderLabels(["Name", "Description", "File"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.search_box)
+        layout.addWidget(self.category_box)
         layout.addWidget(self.table)
 
         self.search_box.textChanged.connect(self.update_filter)
+        self.category_box.currentTextChanged.connect(self.update_filter)
 
         self.data: List[Dict[str, str]] = []
         self.load_data()
+        self._populate_categories()
         self.update_table()
 
     def load_data(self) -> None:
@@ -54,8 +60,19 @@ class SearchPane(QWidget):
         path = QFileDialog.getExistingDirectory(self, "Select Engine Root")
         return path or None
 
+    def _populate_categories(self) -> None:
+        cats = sorted({d.get("category", "") for d in self.data if d.get("category")})
+        for cat in cats:
+            if self.category_box.findText(cat) == -1:
+                self.category_box.addItem(cat)
+
     def update_filter(self, text: str) -> None:
-        filtered = [d for d in self.data if text.lower() in d["name"].lower() or text.lower() in d["description"].lower()]
+        category = self.category_box.currentText()
+        filtered = []
+        for d in self.data:
+            if text.lower() in d["name"].lower() or text.lower() in d["description"].lower():
+                if category == "All" or d.get("category", "") == category:
+                    filtered.append(d)
         self.update_table(filtered)
 
     def update_table(self, items: List[Dict[str, str]] | None = None) -> None:
