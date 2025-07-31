@@ -45,6 +45,7 @@ def _parse_comment_metadata(lines: List[str], idx: int) -> Tuple[str | None, str
 
 
 def index_headers(root: Path, progress: rich.progress.Progress | None = None) -> list[dict[str, str]]:
+def index_headers(root: Path) -> list[dict[str, str]]:
     results = []
     headers = list(iter_headers(root)) if progress else iter_headers(root)
     task_id = None
@@ -67,6 +68,7 @@ def index_headers(root: Path, progress: rich.progress.Progress | None = None) ->
                         "file": str(header),
                     }
                 )
+
         if progress and task_id is not None:
             progress.advance(task_id)
     return results
