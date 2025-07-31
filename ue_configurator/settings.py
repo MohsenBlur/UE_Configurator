@@ -20,4 +20,6 @@ def load_settings() -> Dict[str, Any]:
 
 def save_settings(data: Dict[str, Any]) -> None:
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    SETTINGS_FILE.write_text(json.dumps(data, indent=2))
+    existing = load_settings()
+    existing.update(data)
+    SETTINGS_FILE.write_text(json.dumps(existing, indent=2))
