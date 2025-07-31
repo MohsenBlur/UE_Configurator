@@ -15,13 +15,15 @@ from PySide6.QtWidgets import (
     QHeaderView,
 )
 
-from ..indexer import load_cache, build_cache
+import rich.progress
+from ..indexer import load_cache, build_cache, detect_engine_from_uproject
 
 
 class SearchPane(QWidget):
-    def __init__(self, cache_file: Path) -> None:
+    def __init__(self, cache_file: Path, project_dir: Path | None = None) -> None:
         super().__init__()
         self.cache_file = cache_file
+        self.project_dir = project_dir
         self.setWindowTitle("UE Config Assistant - Search")
 
         self.search_box = QLineEdit()
@@ -49,9 +51,15 @@ class SearchPane(QWidget):
             self.data = load_cache(self.cache_file)
         else:
             self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-            engine_root = self.ask_engine_root()
+            engine_root = None
+            if self.project_dir:
+                engine_root = detect_engine_from_uproject(self.project_dir)
+            if not engine_root:
+                engine_root = self.ask_engine_root()
             if engine_root:
-                build_cache(Path(engine_root), self.cache_file)
+                progress = rich.progress.Progress()
+                with progress:
+                    build_cache(Path(engine_root), self.cache_file, progress)
                 self.data = load_cache(self.cache_file)
 
     def ask_engine_root(self) -> str | None:

@@ -99,6 +99,56 @@ class ConfigDB:
         for ini in self.files:
             ini.write(backup_dir)
 
+    def validate(self) -> Tuple[bool, str | None]:
+        """Check for duplicates and basic syntax issues."""
+        try:
+            for ini in self.files:
+                ini.updater.read(str(ini.path))
+        except Exception as e:  # pragma: no cover - read should rarely fail
+            return False, str(e)
+        if self.find_duplicates():
+            return False, "Duplicate entries detected"
+        return True, None
+
+    def available_targets(self) -> List[str]:
+        return [ini.path.name for ini in self.files]
+
+    def insert_setting(self, section: str, option: str, value: str, target_name: str | None = None) -> None:
+        """Insert ``option`` into the specified ini file or best candidate."""
+        option_l = option.lower()
+        target: IniFile | None = None
+        if target_name:
+            for ini in self.files:
+                if ini.path.name == target_name:
+                    target = ini
+                    break
+        if target is None and self.files:
+            for ini in reversed(self.files):
+                if not (ini.updater.has_section(section) and ini.updater[section].has_option(option_l)):
+                    target = ini
+                    break
+            if target is None:
+                target = self.files[-1]
+        if not target:
+            return
+        if not target.updater.has_section(section):
+            target.updater.add_section(section)
+        target.updater[section][option_l] = value
+
+    def resolve_duplicate(self, section: str, option: str, action: str) -> None:
+        option_l = option.lower()
+        files = self.entries().get((section, option_l))
+        if not files:
+            return
+        files_sorted = sorted(files, key=lambda f: self._priority_of(f.path.name))
+        if action == "comment":
+            for ini in files_sorted[:-1]:
+                ini.comment_option(section, option_l)
+        elif action == "delete":
+            for ini in files_sorted[:-1]:
+                if ini.updater.has_section(section) and ini.updater[section].has_option(option_l):
+                    del ini.updater[section][option_l]
+
     def merge_preset(self, preset_path: Path) -> None:
         """Merge an external preset ``.ini`` file into the highest priority file."""
         if not self.files:

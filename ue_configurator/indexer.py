@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Iterable, List, Dict, Tuple
 
 import rich.progress
+import json as jsonlib
 
 REGISTER = re.compile(
     r'IConsoleVariable::Register\s*\(\s*"(?P<name>[A-Za-z0-9_.]+)"\s*,\s*(?P<default>[^,]+),\s*"(?P<desc>[^"]+)"',
@@ -43,9 +44,14 @@ def _parse_comment_metadata(lines: List[str], idx: int) -> Tuple[str | None, str
     return category, valid_range
 
 
+def index_headers(root: Path, progress: rich.progress.Progress | None = None) -> list[dict[str, str]]:
 def index_headers(root: Path) -> list[dict[str, str]]:
     results = []
-    for header in iter_headers(root):
+    headers = list(iter_headers(root)) if progress else iter_headers(root)
+    task_id = None
+    if progress:
+        task_id = progress.add_task("Headers", total=len(headers))
+    for header in headers:
         text = header.read_text(errors="ignore")
         lines = text.splitlines()
         for idx, line in enumerate(lines):
@@ -62,11 +68,14 @@ def index_headers(root: Path) -> list[dict[str, str]]:
                         "file": str(header),
                     }
                 )
+
+        if progress and task_id is not None:
+            progress.advance(task_id)
     return results
 
 
-def build_cache(engine_root: Path, cache_file: Path) -> None:
-    data = index_headers(engine_root)
+def build_cache(engine_root: Path, cache_file: Path, progress: rich.progress.Progress | None = None) -> None:
+    data = index_headers(engine_root, progress)
     cache_file.write_text(json.dumps(data, indent=2))
 
 
@@ -79,6 +88,19 @@ def load_cache(cache_file: Path) -> List[Dict[str, str]]:
     return []
 
 
+def detect_engine_from_uproject(project_dir: Path) -> Path | None:
+    """Return engine root defined in a project's .uproject."""
+    for up in project_dir.glob("*.uproject"):
+        try:
+            data = jsonlib.loads(up.read_text())
+            assoc = data.get("EngineAssociation")
+            if assoc and Path(assoc).exists():
+                return Path(assoc)
+        except Exception:
+            continue
+    return None
+
+
 def main() -> None:
     import argparse
 
@@ -89,9 +111,7 @@ def main() -> None:
 
     progress = rich.progress.Progress()
     with progress:
-        task = progress.add_task("Indexing", total=None)
-        build_cache(args.engine_root, args.cache)
-        progress.update(task, completed=1)
+        build_cache(args.engine_root, args.cache, progress)
 
     print(f"Cache written to {args.cache}")
 

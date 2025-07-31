@@ -25,8 +25,8 @@ class MainWindow(QMainWindow):
         if config_dir.exists():
             self.db.load(config_dir)
 
-        self.search = SearchPane(cache_file)
-        self.details = DetailsPane()
+        self.search = SearchPane(cache_file, project_dir)
+        self.details = DetailsPane(self.db)
 
         self.search.table.itemSelectionChanged.connect(self.show_details)
 
@@ -56,11 +56,7 @@ class MainWindow(QMainWindow):
         if not rows:
             return
         row = rows[0].row()
-        item = {
-            "name": self.search.table.item(row, 0).text(),
-            "description": self.search.table.item(row, 1).text(),
-            "file": self.search.table.item(row, 2).text(),
-        }
+        item = self.search.data[row]
         self.details.show_details(item)
 
     def show_conflicts(self) -> None:
@@ -68,6 +64,12 @@ class MainWindow(QMainWindow):
         pane.show()
 
     def save_config(self) -> None:
+        ok, msg = self.db.validate()
+        if not ok:
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.warning(self, "Validation Error", msg or "Invalid config")
+            return
         config_dir = self.project_dir / "Config"
         self.db.save(config_dir)
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 
 from PySide6.QtWidgets import (
     QWidget,
@@ -10,6 +11,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QPushButton,
     QFileDialog,
+    QMessageBox,
 )
 
 
@@ -46,8 +48,9 @@ class PresetPane(QWidget):
         path, _ = QFileDialog.getOpenFileName(self, "Select preset", str(self.presets_dir), "INI Files (*.ini)")
         if path:
             dest = self.presets_dir / Path(path).name
-            Path(path).replace(dest)
+            shutil.copy2(path, dest)
             self.db.merge_preset(dest)
+            QMessageBox.information(self, "Preset Imported", f"Imported {dest.name}")
             self.load_presets()
 
     def export_preset(self) -> None:
