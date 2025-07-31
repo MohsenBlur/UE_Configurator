@@ -9,8 +9,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QTreeWidget,
     QTreeWidgetItem,
-    QRadioButton,
-    QButtonGroup,
+    QComboBox,
     QPushButton,
 )
 
@@ -23,14 +22,15 @@ class ConflictPane(QWidget):
         self.db = db
         self.setWindowTitle("Resolve Duplicates")
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Section", "Key", "File"])
-        self.fix_btn = QPushButton("Comment Lower Priority")
+        self.tree.setHeaderLabels(["Section", "Key", "Action"])
+        self.apply_btn = QPushButton("Apply")
+        self.actions: Dict[Tuple[str, str], QComboBox] = {}
         layout = QVBoxLayout(self)
         layout.addWidget(self.tree)
-        layout.addWidget(self.fix_btn)
+        layout.addWidget(self.apply_btn)
         self.populate()
 
-        self.fix_btn.clicked.connect(self.fix)
+        self.apply_btn.clicked.connect(self.apply)
 
     def populate(self) -> None:
         self.tree.clear()
@@ -38,12 +38,18 @@ class ConflictPane(QWidget):
         for (section, option), files in dups.items():
             parent = QTreeWidgetItem([section, option])
             self.tree.addTopLevelItem(parent)
+            combo = QComboBox()
+            combo.addItems(["Comment", "Delete", "Ignore"])
+            self.tree.setItemWidget(parent, 2, combo)
+            self.actions[(section, option)] = combo
             for ini in files:
-                QTreeWidgetItem(parent, ["", ini.path.name])
+                QTreeWidgetItem(parent, ["", "", ini.path.name])
         self.tree.expandAll()
 
-    def fix(self) -> None:
-        self.db.comment_lower_priority()
+    def apply(self) -> None:
+        for (section, option), combo in self.actions.items():
+            action = combo.currentText().lower()
+            self.db.resolve_duplicate(section, option, action)
         if self.db.config_dir:
             self.db.save(self.db.config_dir)
         self.populate()

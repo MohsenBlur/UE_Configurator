@@ -43,5 +43,25 @@ def test_comment_and_save(tmp_path: Path):
     assert ";Key=1" in text or "#Key=1" in text
 
 
+def test_insert_and_resolve(tmp_path: Path):
+    cfg = tmp_path / "Config"
+    cfg.mkdir()
+    ini1 = cfg / "DefaultGame.ini"
+    ini2 = cfg / "ProjectGame.ini"
+    write_ini(ini1, "[ConsoleVariables]\nr.Test=0\n")
+    write_ini(ini2, "[ConsoleVariables]\n")
+
+    db = ConfigDB()
+    db.load(cfg)
+    db.insert_setting("ConsoleVariables", "r.Test", "1", "ProjectGame.ini")
+    db.resolve_duplicate("ConsoleVariables", "r.Test", "delete")
+    db.save(cfg)
+
+    text2 = ini2.read_text().lower()
+    text1 = ini1.read_text().lower()
+    assert "r.test" in text2
+    assert "r.test" not in text1
+
+
 
 
