@@ -9,6 +9,8 @@ from typing import Iterable, List, Dict, Tuple
 
 import rich.progress
 import json as jsonlib
+import requests
+from bs4 import BeautifulSoup
 
 REGISTER = re.compile(
     r'IConsoleVariable::Register\s*\(\s*"(?P<name>[A-Za-z0-9_.]+)"\s*,\s*(?P<default>[^,]+),\s*"(?P<desc>[^"]+)"',
@@ -19,6 +21,54 @@ UE_CVAR = re.compile(
 
 COMMENT_CATEGORY = re.compile(r"Category:\s*(?P<val>.+)")
 COMMENT_RANGE = re.compile(r"Range:\s*(?P<val>.+)")
+
+DOCS_URL = (
+    "https://dev.epicgames.com/documentation/en-us/unreal-engine/"
+    "unreal-engine-console-variables-reference"
+)
+
+
+def parse_console_variable_page(html: str) -> List[Dict[str, str]]:
+    """Parse console variables from a reference HTML page."""
+    soup = BeautifulSoup(html, "html.parser")
+    results: List[Dict[str, str]] = []
+    for table in soup.find_all("table", class_="table"):
+        rows = table.find_all("tr")
+        # Skip the header row that contains column titles.
+        for row in rows[1:]:
+            cols = row.find_all("td")
+            if len(cols) < 3:
+                continue
+            name = cols[0].get_text(strip=True)
+            default = cols[1].get_text(strip=True)
+            desc = cols[2].get_text(strip=True)
+            results.append(
+                {
+                    "name": name,
+                    "description": desc,
+                    "default": default,
+                    "category": "",
+                    "range": "",
+                    "file": "",
+                }
+            )
+    return results
+
+
+def scrape_console_variables(version: str) -> List[Dict[str, str]]:
+    """Fetch console variables from Epic's online documentation for ``version``.
+
+    Parameters
+    ----------
+    version:
+        Engine version string, e.g. "5.4".
+    """
+
+    url = f"{DOCS_URL}?application_version={version}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    resp = requests.get(url, headers=headers, timeout=10)
+    resp.raise_for_status()
+    return parse_console_variable_page(resp.text)
 
 
 def iter_headers(root: Path) -> Iterable[Path]:
