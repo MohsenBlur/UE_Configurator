@@ -20,10 +20,18 @@ from ..indexer import load_cache, build_cache, detect_engine_from_uproject
 
 
 class SearchPane(QWidget):
-    def __init__(self, cache_file: Path, project_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        cache_file: Path,
+        project_dir: Path | None = None,
+        engine_version: str = "5.4",
+        use_local_engine: bool = False,
+    ) -> None:
         super().__init__()
         self.cache_file = cache_file
         self.project_dir = project_dir
+        self.engine_version = engine_version
+        self.use_local_engine = use_local_engine
         self.setWindowTitle("UE Config Assistant - Search")
 
         self.search_box = QLineEdit()
@@ -51,16 +59,23 @@ class SearchPane(QWidget):
             self.data = load_cache(self.cache_file)
         else:
             self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-            engine_root = None
-            if self.project_dir:
-                engine_root = detect_engine_from_uproject(self.project_dir)
-            if not engine_root:
-                engine_root = self.ask_engine_root()
-            if engine_root:
-                progress = rich.progress.Progress()
-                with progress:
-                    build_cache(Path(engine_root), self.cache_file, progress)
-                self.data = load_cache(self.cache_file)
+            if self.use_local_engine:
+                engine_root = None
+                if self.project_dir:
+                    engine_root = detect_engine_from_uproject(self.project_dir)
+                if not engine_root:
+                    engine_root = self.ask_engine_root()
+                if engine_root:
+                    progress = rich.progress.Progress()
+                    with progress:
+                        build_cache(
+                            cache_file=self.cache_file,
+                            engine_root=Path(engine_root),
+                            progress=progress,
+                        )
+            else:
+                build_cache(self.cache_file, version=self.engine_version)
+            self.data = load_cache(self.cache_file)
 
     def ask_engine_root(self) -> str | None:
         from PySide6.QtWidgets import QFileDialog

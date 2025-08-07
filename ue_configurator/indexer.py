@@ -7,8 +7,11 @@ import json
 from pathlib import Path
 from typing import Iterable, List, Dict, Tuple
 
+import contextlib
 import rich.progress
 import json as jsonlib
+import requests
+from bs4 import BeautifulSoup
 
 REGISTER = re.compile(
     r'IConsoleVariable::Register\s*\(\s*"(?P<name>[A-Za-z0-9_.]+)"\s*,\s*(?P<default>[^,]+),\s*"(?P<desc>[^"]+)"',
@@ -19,6 +22,54 @@ UE_CVAR = re.compile(
 
 COMMENT_CATEGORY = re.compile(r"Category:\s*(?P<val>.+)")
 COMMENT_RANGE = re.compile(r"Range:\s*(?P<val>.+)")
+
+DOCS_URL = (
+    "https://dev.epicgames.com/documentation/en-us/unreal-engine/"
+    "unreal-engine-console-variables-reference"
+)
+
+
+def parse_console_variable_page(html: str) -> List[Dict[str, str]]:
+    """Parse console variables from a reference HTML page."""
+    soup = BeautifulSoup(html, "html.parser")
+    results: List[Dict[str, str]] = []
+    for table in soup.find_all("table", class_="table"):
+        rows = table.find_all("tr")
+        # Skip the header row that contains column titles.
+        for row in rows[1:]:
+            cols = row.find_all("td")
+            if len(cols) < 3:
+                continue
+            name = cols[0].get_text(strip=True)
+            default = cols[1].get_text(strip=True)
+            desc = cols[2].get_text(strip=True)
+            results.append(
+                {
+                    "name": name,
+                    "description": desc,
+                    "default": default,
+                    "category": "",
+                    "range": "",
+                    "file": "",
+                }
+            )
+    return results
+
+
+def scrape_console_variables(version: str) -> List[Dict[str, str]]:
+    """Fetch console variables from Epic's online documentation for ``version``.
+
+    Parameters
+    ----------
+    version:
+        Engine version string, e.g. "5.4".
+    """
+
+    url = f"{DOCS_URL}?application_version={version}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    resp = requests.get(url, headers=headers, timeout=10)
+    resp.raise_for_status()
+    return parse_console_variable_page(resp.text)
 
 
 def iter_headers(root: Path) -> Iterable[Path]:
@@ -73,8 +124,29 @@ def index_headers(root: Path, progress: rich.progress.Progress | None = None) ->
     return results
 
 
-def build_cache(engine_root: Path, cache_file: Path, progress: rich.progress.Progress | None = None) -> None:
-    data = index_headers(engine_root, progress)
+def build_cache(
+    cache_file: Path,
+    engine_root: Path | None = None,
+    version: str = "5.4",
+    progress: rich.progress.Progress | None = None,
+) -> None:
+    """Build a cache of console variables.
+
+    Parameters
+    ----------
+    cache_file:
+        Where to write the JSON cache.
+    engine_root:
+        If provided, index local engine headers; otherwise fetch from the
+        online documentation.
+    version:
+        Engine version to scrape when ``engine_root`` is ``None``.
+    """
+
+    if engine_root:
+        data = index_headers(engine_root, progress)
+    else:
+        data = scrape_console_variables(version)
     cache_file.write_text(json.dumps(data, indent=2))
 
 
@@ -103,14 +175,32 @@ def detect_engine_from_uproject(project_dir: Path) -> Path | None:
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Index UE headers for CVars")
-    parser.add_argument("engine_root", type=Path)
-    parser.add_argument("--cache", type=Path, default=Path.home() / ".ue5_config_assistant" / "cvar_cache.json")
+    parser = argparse.ArgumentParser(description="Build CVar cache")
+    parser.add_argument(
+        "--engine-root",
+        type=Path,
+        help="Optional path to a local Unreal Engine source tree",
+    )
+    parser.add_argument(
+        "--version",
+        default="5.4",
+        help="Engine version to scrape from online docs (ignored if --engine-root is provided)",
+    )
+    parser.add_argument(
+        "--cache",
+        type=Path,
+        default=Path.home() / ".ue5_config_assistant" / "cvar_cache.json",
+    )
     args = parser.parse_args()
 
-    progress = rich.progress.Progress()
-    with progress:
-        build_cache(args.engine_root, args.cache, progress)
+    progress = rich.progress.Progress() if args.engine_root else None
+    with progress or contextlib.nullcontext():
+        build_cache(
+            cache_file=args.cache,
+            engine_root=args.engine_root,
+            version=args.version,
+            progress=progress,
+        )
 
     print(f"Cache written to {args.cache}")
 
