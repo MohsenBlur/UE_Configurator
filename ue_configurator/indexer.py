@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Iterable, List, Dict, Tuple
 
+import contextlib
 import rich.progress
 import json as jsonlib
 import requests
@@ -123,8 +124,29 @@ def index_headers(root: Path, progress: rich.progress.Progress | None = None) ->
     return results
 
 
-def build_cache(engine_root: Path, cache_file: Path, progress: rich.progress.Progress | None = None) -> None:
-    data = index_headers(engine_root, progress)
+def build_cache(
+    cache_file: Path,
+    engine_root: Path | None = None,
+    version: str = "5.4",
+    progress: rich.progress.Progress | None = None,
+) -> None:
+    """Build a cache of console variables.
+
+    Parameters
+    ----------
+    cache_file:
+        Where to write the JSON cache.
+    engine_root:
+        If provided, index local engine headers; otherwise fetch from the
+        online documentation.
+    version:
+        Engine version to scrape when ``engine_root`` is ``None``.
+    """
+
+    if engine_root:
+        data = index_headers(engine_root, progress)
+    else:
+        data = scrape_console_variables(version)
     cache_file.write_text(json.dumps(data, indent=2))
 
 
@@ -153,14 +175,32 @@ def detect_engine_from_uproject(project_dir: Path) -> Path | None:
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Index UE headers for CVars")
-    parser.add_argument("engine_root", type=Path)
-    parser.add_argument("--cache", type=Path, default=Path.home() / ".ue5_config_assistant" / "cvar_cache.json")
+    parser = argparse.ArgumentParser(description="Build CVar cache")
+    parser.add_argument(
+        "--engine-root",
+        type=Path,
+        help="Optional path to a local Unreal Engine source tree",
+    )
+    parser.add_argument(
+        "--version",
+        default="5.4",
+        help="Engine version to scrape from online docs (ignored if --engine-root is provided)",
+    )
+    parser.add_argument(
+        "--cache",
+        type=Path,
+        default=Path.home() / ".ue5_config_assistant" / "cvar_cache.json",
+    )
     args = parser.parse_args()
 
-    progress = rich.progress.Progress()
-    with progress:
-        build_cache(args.engine_root, args.cache, progress)
+    progress = rich.progress.Progress() if args.engine_root else None
+    with progress or contextlib.nullcontext():
+        build_cache(
+            cache_file=args.cache,
+            engine_root=args.engine_root,
+            version=args.version,
+            progress=progress,
+        )
 
     print(f"Cache written to {args.cache}")
 
