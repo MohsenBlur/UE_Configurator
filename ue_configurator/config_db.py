@@ -7,7 +7,14 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Tuple
 
-from configupdater import ConfigUpdater
+try:  # pragma: no cover - exercised when optional dependency missing
+    from configupdater import ConfigUpdater
+except ModuleNotFoundError:  # pragma: no cover - fallback for minimal environments
+    # ``configupdater`` is an optional dependency used for comment-preserving INI
+    # edits.  Some environments (like the execution sandbox for this kata) do not
+    # provide the external package.  To keep the project functional we ship a
+    # very small subset implementation in ``_configupdater``.
+    from ._configupdater import ConfigUpdater
 
 
 class IniFile:
