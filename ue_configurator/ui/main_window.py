@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtWidgets import QSplitter, QMainWindow, QAction
+from PySide6.QtWidgets import QSplitter, QMainWindow
+from PySide6.QtGui import QAction
 
 from ..config_db import ConfigDB
 from .conflict_pane import ConflictPane
