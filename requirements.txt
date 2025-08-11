@@ -3,4 +3,5 @@ configupdater
 rich
 pytest
 requests
+cloudscraper
 beautifulsoup4
