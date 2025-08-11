@@ -30,11 +30,15 @@ def test_scrape_console_variables(monkeypatch):
         text = SAMPLE_HTML
         def raise_for_status(self):
             return None
+    captured = {}
     def fake_get(url, headers, timeout):
+        captured.update(headers)
         return DummyResp()
     monkeypatch.setattr("ue_configurator.indexer.requests.get", fake_get)
     data = scrape_console_variables("5.6")
     assert [d["name"] for d in data] == ["r.Test", "r.Test2"]
+    # Ensure that our request includes the additional browser-like headers
+    assert captured.get("Referer") == "https://dev.epicgames.com/documentation/"
 
 
 def test_build_cache_online(monkeypatch, tmp_path: Path):
