@@ -77,6 +77,9 @@ def scrape_console_variables(version: str) -> List[Dict[str, str]]:
         ),
         "Accept-Language": "en-US,en;q=0.5",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        # Some regions appear to require a referer header for the request to
+        # succeed.  Provide one to further mimic a real browser request.
+        "Referer": "https://dev.epicgames.com/documentation/",
     }
     resp = requests.get(url, headers=headers, timeout=10)
     try:
