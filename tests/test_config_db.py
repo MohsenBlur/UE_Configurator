@@ -23,8 +23,7 @@ def test_duplicate_detection(tmp_path: Path):
     assert ("Section", "key") in dups
     assert len(dups[("Section", "key")]) == 2
 
-
-def test_comment_and_save(tmp_path: Path):
+def test_comment_requires_user_action(tmp_path: Path):
     cfg = tmp_path / "Config"
     cfg.mkdir()
     ini1 = cfg / "DefaultGame.ini"
@@ -34,11 +33,17 @@ def test_comment_and_save(tmp_path: Path):
 
     db = ConfigDB()
     db.load(cfg)
+    # Saving without resolving duplicates should keep both entries intact
+    db.save(cfg)
+    text = ini1.read_text()
+    assert "Key=1" in text and ";Key=1" not in text and "#Key=1" not in text
+
+    # User explicitly resolves the duplicate by commenting the lower priority
+    db.resolve_duplicate("Section", "Key", "comment")
     db.save(cfg)
 
     backup_dirs = list((cfg / "Backup").iterdir())
     assert backup_dirs, "backup created"
-    # lower priority file should have commented entry
     text = ini1.read_text()
     assert ";Key=1" in text or "#Key=1" in text
 
