@@ -87,14 +87,19 @@ class ConfigDB:
         return dups
 
     def comment_lower_priority(self) -> None:
+        """Comment out duplicate entries keeping the highest priority entry.
+
+        This method no longer runs implicitly during :meth:`save`.  Call it
+        explicitly if automatic duplicate commenting is desired; otherwise
+        duplicates will remain untouched so the user can decide how to handle
+        them.
+        """
         dups = self.find_duplicates()
         for (section, option), files in dups.items():
-            # sort files by priority
             files_sorted = sorted(
                 files,
                 key=lambda f: self._priority_of(f.path.name),
             )
-            # keep highest priority (last) uncommented
             for ini in files_sorted[:-1]:
                 ini.comment_option(section, option)
 
@@ -106,7 +111,6 @@ class ConfigDB:
 
     def save(self, config_dir: Path) -> None:
         backup_dir = config_dir / "Backup" / datetime.now().strftime("%Y-%m-%d-%H%M%S")
-        self.comment_lower_priority()
         for ini in self.files:
             ini.write(backup_dir)
 
