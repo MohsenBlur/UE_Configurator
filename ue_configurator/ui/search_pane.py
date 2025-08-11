@@ -73,6 +73,8 @@ class SearchPane(QWidget):
                             engine_root=Path(engine_root),
                             progress=progress,
                         )
+                else:
+                    build_cache(self.cache_file, version=self.engine_version)
             else:
                 build_cache(self.cache_file, version=self.engine_version)
             self.data = load_cache(self.cache_file)

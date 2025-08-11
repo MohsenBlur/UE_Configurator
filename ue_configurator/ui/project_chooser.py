@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QPushButton,
     QFileDialog,
+    QCheckBox,
 )
 
 from .main_window import MainWindow
@@ -43,9 +44,11 @@ class ProjectChooser(QWidget):
         self.layout = QVBoxLayout(self)
         self.recent = QListWidget()
         self.browse_btn = QPushButton("Browse for .uproject")
+        self.local_engine_chk = QCheckBox("Use local engine headers")
 
         self.layout.addWidget(self.recent)
         self.layout.addWidget(self.browse_btn)
+        self.layout.addWidget(self.local_engine_chk)
 
         self.browse_btn.clicked.connect(self.browse)
         self.recent.itemDoubleClicked.connect(self.open_recent)
@@ -73,7 +76,11 @@ class ProjectChooser(QWidget):
 
         cache = Path.home() / ".ue5_config_assistant" / "cvar_cache.json"
         project_dir = Path(path).parent
-        self.main_window = MainWindow(cache, project_dir)  # type: ignore[attr-defined]
+        self.main_window = MainWindow(
+            cache,
+            project_dir,
+            use_local_engine=self.local_engine_chk.isChecked(),
+        )  # type: ignore[attr-defined]
         self.main_window.show()
         save_settings({"chooser_geometry": self.saveGeometry().data().hex()})
         self.close()

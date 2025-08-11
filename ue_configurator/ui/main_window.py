@@ -19,7 +19,7 @@ from .details_pane import DetailsPane
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, cache_file: Path, project_dir: Path) -> None:
+    def __init__(self, cache_file: Path, project_dir: Path, use_local_engine: bool = False) -> None:
         super().__init__()
         self.setWindowTitle("UE Config Assistant")
         self.project_dir = project_dir
@@ -31,7 +31,7 @@ class MainWindow(QMainWindow):
         if config_dir.exists():
             self.db.load(config_dir)
 
-        self.search = SearchPane(cache_file, project_dir)
+        self.search = SearchPane(cache_file, project_dir, use_local_engine=use_local_engine)
         self.details = DetailsPane(self.db)
 
         self.search.table.itemSelectionChanged.connect(self.show_details)
