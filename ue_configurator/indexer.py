@@ -11,7 +11,10 @@ import contextlib
 import rich.progress
 import json as jsonlib
 import requests
-import cloudscraper
+try:
+    import cloudscraper  # type: ignore
+except ModuleNotFoundError:
+    cloudscraper = None  # type: ignore
 from bs4 import BeautifulSoup
 
 REGISTER = re.compile(
@@ -85,8 +88,9 @@ def scrape_console_variables(version: str) -> List[Dict[str, str]]:
     resp = requests.get(url, headers=headers, timeout=10)
     if resp.status_code == 403:
         # Some environments sit behind Cloudflare protection which rejects
-        # generic requests.  Retry using cloudscraper which simulates a real
-        # browser more effectively.
+        # generic requests. Retry with cloudscraper if available.
+        if cloudscraper is None:
+            raise RuntimeError("HTTP 403 received; install 'cloudscraper' for retry")
         scraper = cloudscraper.create_scraper()
         resp = scraper.get(url, headers=headers, timeout=10)
     try:
