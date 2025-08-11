@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 import shutil
 
@@ -39,22 +40,40 @@ class PresetPane(QWidget):
         self.load_presets()
 
     def load_presets(self) -> None:
-        self.list.clear()
-        self.presets_dir.mkdir(parents=True, exist_ok=True)
-        for p in self.presets_dir.glob("*.ini"):
-            self.list.addItem(p.name)
+        try:
+            self.list.clear()
+            self.presets_dir.mkdir(parents=True, exist_ok=True)
+            for p in self.presets_dir.glob("*.ini"):
+                self.list.addItem(p.name)
+        except Exception:
+            logging.exception("Failed to load presets")
 
     def import_preset(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Select preset", str(self.presets_dir), "INI Files (*.ini)")
-        if path:
-            dest = self.presets_dir / Path(path).name
-            shutil.copy2(path, dest)
-            self.db.merge_preset(dest)
-            QMessageBox.information(self, "Preset Imported", f"Imported {dest.name}")
-            self.load_presets()
+        try:
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Select preset", str(self.presets_dir), "INI Files (*.ini)"
+            )
+            if path:
+                dest = self.presets_dir / Path(path).name
+                shutil.copy2(path, dest)
+                self.db.merge_preset(dest)
+                QMessageBox.information(
+                    self, "Preset Imported", f"Imported {dest.name}"
+                )
+                self.load_presets()
+        except Exception:
+            logging.exception("Failed to import preset")
 
     def export_preset(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(self, "Save preset", str(self.presets_dir / "preset.ini"), "INI Files (*.ini)")
-        if path:
-            self.db.export_preset(Path(path))
+        try:
+            path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save preset",
+                str(self.presets_dir / "preset.ini"),
+                "INI Files (*.ini)",
+            )
+            if path:
+                self.db.export_preset(Path(path))
+        except Exception:
+            logging.exception("Failed to export preset")
 

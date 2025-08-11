@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from PySide6.QtWidgets import QSplitter, QMainWindow
@@ -22,6 +23,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("UE Config Assistant")
         self.project_dir = project_dir
         self.db = ConfigDB()
+        self.conflict_pane: ConflictPane | None = None
+        self.preset_pane: PresetPane | None = None
         config_dir = project_dir / "Config"
         if config_dir.exists():
             self.db.load(config_dir)
@@ -61,8 +64,11 @@ class MainWindow(QMainWindow):
         self.details.show_details(item)
 
     def show_conflicts(self) -> None:
-        pane = ConflictPane(self.db)
-        pane.show()
+        try:
+            self.conflict_pane = ConflictPane(self.db)
+            self.conflict_pane.show()
+        except Exception:
+            logging.exception("Failed to open conflict pane")
 
     def save_config(self) -> None:
         ok, msg = self.db.validate()
@@ -79,6 +85,9 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
     def show_presets(self) -> None:
-        presets = self.project_dir / "Presets"
-        pane = PresetPane(presets, self.db)
-        pane.show()
+        try:
+            presets = self.project_dir / "Presets"
+            self.preset_pane = PresetPane(presets, self.db)
+            self.preset_pane.show()
+        except Exception:
+            logging.exception("Failed to open presets pane")
