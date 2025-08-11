@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Dict, Tuple, List
 
 from PySide6.QtWidgets import (
@@ -33,23 +34,29 @@ class ConflictPane(QWidget):
         self.apply_btn.clicked.connect(self.apply)
 
     def populate(self) -> None:
-        self.tree.clear()
-        dups = self.db.find_duplicates()
-        for (section, option), files in dups.items():
-            parent = QTreeWidgetItem([section, option])
-            self.tree.addTopLevelItem(parent)
-            combo = QComboBox()
-            combo.addItems(["Comment", "Delete", "Ignore"])
-            self.tree.setItemWidget(parent, 2, combo)
-            self.actions[(section, option)] = combo
-            for ini in files:
-                QTreeWidgetItem(parent, ["", "", ini.path.name])
-        self.tree.expandAll()
+        try:
+            self.tree.clear()
+            dups = self.db.find_duplicates()
+            for (section, option), files in dups.items():
+                parent = QTreeWidgetItem([section, option])
+                self.tree.addTopLevelItem(parent)
+                combo = QComboBox()
+                combo.addItems(["Comment", "Delete", "Ignore"])
+                self.tree.setItemWidget(parent, 2, combo)
+                self.actions[(section, option)] = combo
+                for ini in files:
+                    QTreeWidgetItem(parent, ["", "", ini.path.name])
+            self.tree.expandAll()
+        except Exception:
+            logging.exception("Failed to populate duplicates pane")
 
     def apply(self) -> None:
-        for (section, option), combo in self.actions.items():
-            action = combo.currentText().lower()
-            self.db.resolve_duplicate(section, option, action)
-        if self.db.config_dir:
-            self.db.save(self.db.config_dir)
-        self.populate()
+        try:
+            for (section, option), combo in self.actions.items():
+                action = combo.currentText().lower()
+                self.db.resolve_duplicate(section, option, action)
+            if self.db.config_dir:
+                self.db.save(self.db.config_dir)
+            self.populate()
+        except Exception:
+            logging.exception("Failed to apply duplicate resolution")
