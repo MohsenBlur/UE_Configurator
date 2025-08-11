@@ -63,5 +63,23 @@ def test_insert_and_resolve(tmp_path: Path):
     assert "r.test" not in text1
 
 
+def test_load_ini_with_internal_duplicates(tmp_path: Path) -> None:
+    cfg = tmp_path / "Config"
+    cfg.mkdir()
+    ini = cfg / "DefaultGame.ini"
+    # same key appears twice in the file which previously triggered
+    # ``DuplicateOptionError`` during loading.
+    write_ini(ini, "[Section]\nKey=1\nKey=2\n")
+
+    db = ConfigDB()
+    # should not raise
+    db.load(cfg)
+    assert db.files, "ini file loaded"
+    dups = db.find_duplicates()
+    assert ("Section", "key") in dups
+    # same file is returned twice for the duplicate entries
+    assert len(dups[("Section", "key")]) == 2
+
+
 
 

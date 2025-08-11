@@ -22,7 +22,11 @@ class IniFile:
 
     def __init__(self, path: Path) -> None:
         self.path = path
-        self.updater = ConfigUpdater()
+        # ``configupdater`` raises ``DuplicateOptionError`` when the same option
+        # appears multiple times within a section.  Some real world UE ini files
+        # contain such duplicates, so read with ``strict=False`` to keep loading
+        # resilient and let our own duplicate detection handle conflicts.
+        self.updater = ConfigUpdater(strict=False)
         if path.exists():
             self.updater.read(str(path))
 
@@ -161,7 +165,7 @@ class ConfigDB:
         if not self.files:
             return
         target = self.files[-1]
-        updater = ConfigUpdater()
+        updater = ConfigUpdater(strict=False)
         updater.read(str(preset_path))
         for sec in updater.sections():
             if not target.updater.has_section(sec):
@@ -171,7 +175,7 @@ class ConfigDB:
 
     def export_preset(self, path: Path) -> None:
         """Export current merged config to ``path``."""
-        merged = ConfigUpdater()
+        merged = ConfigUpdater(strict=False)
         for ini in self.files:
             for sec in ini.updater.sections():
                 if not merged.has_section(sec):
