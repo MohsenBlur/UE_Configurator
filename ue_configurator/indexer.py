@@ -11,6 +11,7 @@ import contextlib
 import rich.progress
 import json as jsonlib
 import requests
+import cloudscraper
 from bs4 import BeautifulSoup
 
 REGISTER = re.compile(
@@ -82,6 +83,12 @@ def scrape_console_variables(version: str) -> List[Dict[str, str]]:
         "Referer": "https://dev.epicgames.com/documentation/",
     }
     resp = requests.get(url, headers=headers, timeout=10)
+    if resp.status_code == 403:
+        # Some environments sit behind Cloudflare protection which rejects
+        # generic requests.  Retry using cloudscraper which simulates a real
+        # browser more effectively.
+        scraper = cloudscraper.create_scraper()
+        resp = scraper.get(url, headers=headers, timeout=10)
     try:
         resp.raise_for_status()
     except requests.HTTPError as exc:  # pragma: no cover - network dependent

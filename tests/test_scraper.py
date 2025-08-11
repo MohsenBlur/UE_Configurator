@@ -1,5 +1,6 @@
 import sys, os; sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import json
+import types
 from pathlib import Path
 from ue_configurator.indexer import parse_console_variable_page, scrape_console_variables, build_cache
 
@@ -27,7 +28,9 @@ def test_parse_console_variable_page():
 
 def test_scrape_console_variables(monkeypatch):
     class DummyResp:
+        status_code = 200
         text = SAMPLE_HTML
+
         def raise_for_status(self):
             return None
     captured = {}
@@ -39,6 +42,43 @@ def test_scrape_console_variables(monkeypatch):
     assert [d["name"] for d in data] == ["r.Test", "r.Test2"]
     # Ensure that our request includes the additional browser-like headers
     assert captured.get("Referer") == "https://dev.epicgames.com/documentation/"
+
+
+def test_scrape_console_variables_cloudflare(monkeypatch):
+    class ForbiddenResp:
+        status_code = 403
+        text = ""
+
+        def raise_for_status(self):
+            return None
+
+    class DummyResp:
+        status_code = 200
+        text = SAMPLE_HTML
+
+        def raise_for_status(self):
+            return None
+
+    def fake_requests_get(url, headers, timeout):
+        return ForbiddenResp()
+
+    called = {}
+
+    class DummyScraper:
+        def get(self, url, headers, timeout):
+            called["used"] = True
+            return DummyResp()
+
+    # Patch requests.get to simulate a 403 response
+    monkeypatch.setattr("ue_configurator.indexer.requests.get", fake_requests_get)
+    # Patch cloudscraper.create_scraper to return our dummy scraper
+    monkeypatch.setattr(
+        "ue_configurator.indexer.cloudscraper",
+        types.SimpleNamespace(create_scraper=lambda: DummyScraper()),
+    )
+    data = scrape_console_variables("5.6")
+    assert called.get("used") is True
+    assert [d["name"] for d in data] == ["r.Test", "r.Test2"]
 
 
 def test_build_cache_online(monkeypatch, tmp_path: Path):
