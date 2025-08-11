@@ -11,6 +11,7 @@ from PySide6.QtGui import QAction
 from ..config_db import ConfigDB
 from .conflict_pane import ConflictPane
 from .preset_pane import PresetPane
+from .files_pane import FilesPane
 from ..settings import load_settings, save_settings
 
 from .search_pane import SearchPane
@@ -25,6 +26,7 @@ class MainWindow(QMainWindow):
         self.db = ConfigDB()
         self.conflict_pane: ConflictPane | None = None
         self.preset_pane: PresetPane | None = None
+        self.files_pane: FilesPane | None = None
         config_dir = project_dir / "Config"
         if config_dir.exists():
             self.db.load(config_dir)
@@ -45,10 +47,13 @@ class MainWindow(QMainWindow):
         conflict_action.triggered.connect(self.show_conflicts)
         preset_action = QAction("Presets", self)
         preset_action.triggered.connect(self.show_presets)
+        files_action = QAction("Config Files", self)
+        files_action.triggered.connect(self.show_files)
         save_action = QAction("Save", self)
         save_action.triggered.connect(self.save_config)
         self.menuBar().addAction(conflict_action)
         self.menuBar().addAction(preset_action)
+        self.menuBar().addAction(files_action)
         self.menuBar().addAction(save_action)
 
         settings = load_settings()
@@ -91,3 +96,10 @@ class MainWindow(QMainWindow):
             self.preset_pane.show()
         except Exception:
             logging.exception("Failed to open presets pane")
+
+    def show_files(self) -> None:
+        try:
+            self.files_pane = FilesPane(self.db, self.details._populate_targets)
+            self.files_pane.show()
+        except Exception:
+            logging.exception("Failed to open files pane")

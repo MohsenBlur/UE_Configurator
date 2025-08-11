@@ -18,10 +18,11 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for minimal environme
 
 
 class IniFile:
-    """Wrapper around ConfigUpdater preserving file path."""
+    """Wrapper around ConfigUpdater preserving file path and enabled state."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, enabled: bool = True) -> None:
         self.path = path
+        self.enabled = enabled
         # ``configupdater`` raises ``DuplicateOptionError`` when the same option
         # appears multiple times within a section.  Some real world UE ini files
         # contain such duplicates, so read with ``strict=False`` to keep loading
@@ -62,6 +63,7 @@ class ConfigDB:
     def load(self, config_dir: Path) -> None:
         """Load all known ini files from ``config_dir``."""
         self.config_dir = config_dir
+        self.files = []
         patterns = [
             "Default*.ini",
             "Project*.ini",
@@ -72,9 +74,24 @@ class ConfigDB:
             for path in sorted(config_dir.glob(pat)):
                 self.files.append(IniFile(path))
 
+    # new helper methods
+    def list_files(self) -> List[Tuple[str, bool]]:
+        """Return list of (filename, enabled) for all discovered ini files."""
+        return [(ini.path.name, ini.enabled) for ini in self.files]
+
+    def set_file_enabled(self, filename: str, enabled: bool) -> None:
+        """Toggle whether a given ini file participates in operations."""
+        for ini in self.files:
+            if ini.path.name == filename:
+                ini.enabled = enabled
+                break
+
+    def _active_files(self) -> List[IniFile]:
+        return [ini for ini in self.files if ini.enabled]
+
     def entries(self) -> Dict[Tuple[str, str], List[IniFile]]:
         result: Dict[Tuple[str, str], List[IniFile]] = {}
-        for ini in self.files:
+        for ini in self._active_files():
             for sec_name in ini.updater.sections():
                 section = ini.updater[sec_name]
                 for opt_name, option in section.items():
@@ -111,13 +128,13 @@ class ConfigDB:
 
     def save(self, config_dir: Path) -> None:
         backup_dir = config_dir / "Backup" / datetime.now().strftime("%Y-%m-%d-%H%M%S")
-        for ini in self.files:
+        for ini in self._active_files():
             ini.write(backup_dir)
 
     def validate(self) -> Tuple[bool, str | None]:
         """Check for duplicates and basic syntax issues."""
         try:
-            for ini in self.files:
+            for ini in self._active_files():
                 ini.updater.read(str(ini.path))
         except Exception as e:  # pragma: no cover - read should rarely fail
             return False, str(e)
@@ -126,24 +143,25 @@ class ConfigDB:
         return True, None
 
     def available_targets(self) -> List[str]:
-        return [ini.path.name for ini in self.files]
+        return [ini.path.name for ini in self._active_files()]
 
     def insert_setting(self, section: str, option: str, value: str, target_name: str | None = None) -> None:
         """Insert ``option`` into the specified ini file or best candidate."""
         option_l = option.lower()
         target: IniFile | None = None
         if target_name:
-            for ini in self.files:
+            for ini in self._active_files():
                 if ini.path.name == target_name:
                     target = ini
                     break
-        if target is None and self.files:
-            for ini in reversed(self.files):
+        active = self._active_files()
+        if target is None and active:
+            for ini in reversed(active):
                 if not (ini.updater.has_section(section) and ini.updater[section].has_option(option_l)):
                     target = ini
                     break
             if target is None:
-                target = self.files[-1]
+                target = active[-1]
         if not target:
             return
         if not target.updater.has_section(section):
@@ -166,9 +184,10 @@ class ConfigDB:
 
     def merge_preset(self, preset_path: Path) -> None:
         """Merge an external preset ``.ini`` file into the highest priority file."""
-        if not self.files:
+        active = self._active_files()
+        if not active:
             return
-        target = self.files[-1]
+        target = active[-1]
         updater = ConfigUpdater(strict=False)
         updater.read(str(preset_path))
         for sec in updater.sections():
@@ -180,7 +199,7 @@ class ConfigDB:
     def export_preset(self, path: Path) -> None:
         """Export current merged config to ``path``."""
         merged = ConfigUpdater(strict=False)
-        for ini in self.files:
+        for ini in self._active_files():
             for sec in ini.updater.sections():
                 if not merged.has_section(sec):
                     merged.add_section(sec)

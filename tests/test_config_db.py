@@ -86,5 +86,30 @@ def test_load_ini_with_internal_duplicates(tmp_path: Path) -> None:
     assert len(dups[("Section", "key")]) == 2
 
 
+def test_ignore_files(tmp_path: Path) -> None:
+    cfg = tmp_path / "Config"
+    cfg.mkdir()
+    ini1 = cfg / "DefaultGame.ini"
+    ini2 = cfg / "ProjectGame.ini"
+    write_ini(ini1, "[Section]\nKey=1\n")
+    write_ini(ini2, "[Section]\nKey=2\n")
+
+    db = ConfigDB()
+    db.load(cfg)
+    # disable the default ini
+    db.set_file_enabled("DefaultGame.ini", False)
+
+    # only project ini should be available
+    assert db.available_targets() == ["ProjectGame.ini"]
+    # no duplicates when one file is ignored
+    assert db.find_duplicates() == {}
+
+    # insert without specifying target should go to project ini
+    db.insert_setting("Section", "NewKey", "3")
+    db.save(cfg)
+    assert "newkey" in ini2.read_text().lower()
+    assert "newkey" not in ini1.read_text().lower()
+
+
 
 
