@@ -66,9 +66,25 @@ def scrape_console_variables(version: str) -> List[Dict[str, str]]:
     """
 
     url = f"{DOCS_URL}?application_version={version}"
-    headers = {"User-Agent": "Mozilla/5.0"}
+    # Some locations block generic user agents or requests without language
+    # headers and respond with HTTP 403.  Pretend to be a real browser so that
+    # the request succeeds more reliably for end users.
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/118.0 Safari/537.36"
+        ),
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
     resp = requests.get(url, headers=headers, timeout=10)
-    resp.raise_for_status()
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as exc:  # pragma: no cover - network dependent
+        raise RuntimeError(
+            f"Failed to fetch console variable reference for UE {version}: {exc}"
+        ) from exc
     return parse_console_variable_page(resp.text)
 
 
@@ -146,7 +162,13 @@ def build_cache(
     if engine_root:
         data = index_headers(engine_root, progress)
     else:
-        data = scrape_console_variables(version)
+        try:
+            data = scrape_console_variables(version)
+        except Exception as exc:  # pragma: no cover - network dependent
+            # Network errors should not abort application startup; create an
+            # empty cache instead and allow the caller to continue.
+            print(f"Warning: unable to build online cache: {exc}")
+            data = []
     cache_file.write_text(json.dumps(data, indent=2))
 
 
