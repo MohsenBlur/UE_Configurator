@@ -137,7 +137,8 @@ class ConfigDB:
         """Check for duplicates and basic syntax issues."""
         try:
             for ini in self._active_files():
-                ini.updater.read(str(ini.path))
+                tmp = ConfigUpdater(strict=False)
+                tmp.read(str(ini.path))
         except Exception as e:  # pragma: no cover - read should rarely fail
             return False, str(e)
         if self.find_duplicates():
