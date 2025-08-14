@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from PySide6.QtWidgets import QSplitter, QMainWindow, QMessageBox
-from PySide6.QtGui import QAction, QDesktopServices
+from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
 from PySide6.QtCore import QUrl
 
 from ..config_db import ConfigDB
@@ -45,12 +45,23 @@ class MainWindow(QMainWindow):
 
         # menu actions
         conflict_action = QAction("Show Duplicates", self)
+        conflict_action.setShortcut(QKeySequence("Ctrl+D"))
+        conflict_action.setToolTip("Show duplicate entries (Ctrl+D)")
         conflict_action.triggered.connect(self.show_conflicts)
+
         preset_action = QAction("Presets", self)
+        preset_action.setShortcut(QKeySequence("Ctrl+P"))
+        preset_action.setToolTip("Manage presets (Ctrl+P)")
         preset_action.triggered.connect(self.show_presets)
+
         files_action = QAction("Config Files", self)
+        files_action.setShortcut(QKeySequence("Ctrl+F"))
+        files_action.setToolTip("Browse config files (Ctrl+F)")
         files_action.triggered.connect(self.show_files)
+
         save_action = QAction("Save", self)
+        save_action.setShortcut(QKeySequence("Ctrl+S"))
+        save_action.setToolTip("Validate and save configuration (Ctrl+S)")
         save_action.triggered.connect(self.save_config)
         self.menuBar().addAction(conflict_action)
         self.menuBar().addAction(preset_action)

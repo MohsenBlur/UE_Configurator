@@ -45,24 +45,28 @@ The main window consists of a search pane (left) and a details pane (right):
 
 ## 7. Resolving Duplicate Entries
 
-- Select **"Show Duplicates"** from the menu to open the conflict pane.
+- Select **"Show Duplicates"** from the menu or press <kbd>Ctrl+D</kbd> to open the conflict pane.
 - For each duplicate key, choose whether to comment out or delete lower priority entries.
 - Click **"Apply"** to update the staged configuration.
 
-## 8. Saving Changes
+## 8. Viewing Config Files
 
-1. Choose **"Save"** from the menu.
+- Select **"Config Files"** from the menu or press <kbd>Ctrl+F</kbd> to view and edit your project's configuration files.
+
+## 9. Saving Changes
+
+1. Choose **"Save"** from the menu or press <kbd>Ctrl+S</kbd>.
 2. The tool validates syntax and duplicate resolution.
 3. On success, new `.ini` files are written to your project’s `Config` folder.
 4. Originals are backed up to `Config/Backup/<timestamp>/`.
 
-## 9. Working with Presets
+## 10. Working with Presets
 
-- Select **"Presets"** from the menu to manage reusable configuration snippets.
+- Select **"Presets"** from the menu or press <kbd>Ctrl+P</kbd> to manage reusable configuration snippets.
 - **Import** adds settings from an existing preset file.
 - **Export Current** saves your merged configuration as a preset.
 
-## 10. Tips
+## 11. Tips
 
 - Window sizes and recent projects are stored in `~/.ue5_config_assistant/` so they persist across sessions.
 - You can rerun the tool at any time to edit or review your project’s configuration.
