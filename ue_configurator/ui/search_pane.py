@@ -23,9 +23,15 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QProgressDialog,
     QMessageBox,
+    QPushButton,
 )
 
-from ..indexer import load_cache, build_cache, detect_engine_from_uproject
+from ..indexer import (
+    load_cache,
+    build_cache,
+    detect_engine_from_uproject,
+    detect_version_from_uproject,
+)
 
 
 class SearchFilterProxyModel(QSortFilterProxyModel):
@@ -118,9 +124,18 @@ class SearchPane(QWidget):
         use_local_engine: bool = False,
     ) -> None:
         super().__init__()
-        self.cache_file = cache_file
         self.project_dir = project_dir
+        detected = (
+            detect_version_from_uproject(project_dir)
+            if project_dir is not None
+            else None
+        )
+        if detected:
+            engine_version = detected
         self.engine_version = engine_version
+        self.cache_file = cache_file.with_name(
+            f"{cache_file.stem}-{self.engine_version}{cache_file.suffix}"
+        )
         self.use_local_engine = use_local_engine
         self.setWindowTitle("UE Config Assistant - Search")
 
@@ -143,10 +158,13 @@ class SearchPane(QWidget):
         layout = QVBoxLayout(self)
         layout.addWidget(self.search_box)
         layout.addWidget(self.category_box)
+        self.rebuild_btn = QPushButton("Rebuild Cache")
+        layout.addWidget(self.rebuild_btn)
         layout.addWidget(self.table)
 
         self.search_box.textChanged.connect(self.update_filter)
         self.category_box.currentTextChanged.connect(self.update_filter)
+        self.rebuild_btn.clicked.connect(self.rebuild_cache)
 
         self.data: List[Dict[str, str]] = []
         self.load_data()
@@ -171,6 +189,15 @@ class SearchPane(QWidget):
                     engine_root = Path(chosen)
 
         self._build_cache(engine_root)
+
+    def rebuild_cache(self) -> None:
+        if self.cache_file.exists():
+            try:
+                self.cache_file.unlink()
+            except OSError:
+                pass
+        self.data = []
+        self.load_data()
 
     def ask_engine_root(self) -> str | None:
         from PySide6.QtWidgets import QFileDialog

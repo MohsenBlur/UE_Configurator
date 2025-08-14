@@ -98,6 +98,6 @@ def test_build_cache_online(monkeypatch, tmp_path: Path):
         "ue_configurator.indexer.scrape_console_variables", fake_scrape
     )
     cache = tmp_path / "cache.json"
-    build_cache(cache)
-    data = json.loads(cache.read_text())
+    built = build_cache(cache)
+    data = json.loads(built.read_text())
     assert data[0]["name"] == "r.Online"

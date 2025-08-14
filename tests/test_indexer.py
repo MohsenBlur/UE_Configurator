@@ -1,5 +1,10 @@
 import sys, os; sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from ue_configurator.indexer import index_headers, load_cache, detect_engine_from_uproject
+from ue_configurator.indexer import (
+    index_headers,
+    load_cache,
+    detect_engine_from_uproject,
+    detect_version_from_uproject,
+)
 from pathlib import Path
 
 def test_index_headers(tmp_path: Path):
@@ -17,8 +22,9 @@ def test_index_headers(tmp_path: Path):
 
 def test_load_cache(tmp_path: Path):
     cache = tmp_path / "cache.json"
-    cache.write_text('[{"name": "r.Test", "description": "Test", "default": "1", "category": "Cat", "range": "0-1"}]')
-    data = load_cache(cache)
+    versioned = cache.with_name("cache-5.4.json")
+    versioned.write_text('[{"name": "r.Test", "description": "Test", "default": "1", "category": "Cat", "range": "0-1"}]')
+    data = load_cache(cache, version="5.4")
     assert data[0]["name"] == "r.Test"
     assert data[0]["default"] == "1"
 
@@ -31,3 +37,10 @@ def test_detect_engine(tmp_path: Path):
     (proj / "Proj.uproject").write_text('{"EngineAssociation": "%s"}' % engine)
     found = detect_engine_from_uproject(proj)
     assert found == engine
+
+
+def test_detect_version(tmp_path: Path):
+    proj = tmp_path / "Proj"
+    proj.mkdir()
+    (proj / "Proj.uproject").write_text('{"EngineAssociation": "5.2"}')
+    assert detect_version_from_uproject(proj) == "5.2"
