@@ -56,7 +56,8 @@ The main window consists of a search pane (left) and a details pane (right):
 ## 9. Saving Changes
 
 1. Choose **"Save"** from the menu or press <kbd>Ctrl+S</kbd>.
-2. The tool validates syntax and duplicate resolution.
+2. The tool validates syntax and duplicate resolution using a temporary parser.
+   Unsaved in-memory edits remain intact even if validation fails.
 3. On success, new `.ini` files are written to your project’s `Config` folder.
 4. Originals are backed up to `Config/Backup/<timestamp>/`.
 

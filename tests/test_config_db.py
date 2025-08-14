@@ -111,5 +111,22 @@ def test_ignore_files(tmp_path: Path) -> None:
     assert "newkey" not in ini1.read_text().lower()
 
 
+def test_insert_persists_after_validate(tmp_path: Path) -> None:
+    cfg = tmp_path / "Config"
+    cfg.mkdir()
+    ini = cfg / "DefaultGame.ini"
+    write_ini(ini, "[Section]\nKey=1\n")
+
+    db = ConfigDB()
+    db.load(cfg)
+    db.insert_setting("Section", "NewKey", "2")
+    assert ("Section", "newkey") in db.entries()
+
+    db.validate()
+
+    assert ("Section", "newkey") in db.entries()
+    assert db.files[0].updater["Section"]["newkey"].value == "2"
+
+
 
 
