@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PySide6.QtWidgets import QSplitter, QMainWindow
-from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QSplitter, QMainWindow, QMessageBox
+from PySide6.QtGui import QAction, QDesktopServices
+from PySide6.QtCore import QUrl
 
 from ..config_db import ConfigDB
 from .conflict_pane import ConflictPane
@@ -78,12 +79,20 @@ class MainWindow(QMainWindow):
     def save_config(self) -> None:
         ok, msg = self.db.validate()
         if not ok:
-            from PySide6.QtWidgets import QMessageBox
-
             QMessageBox.warning(self, "Validation Error", msg or "Invalid config")
             return
         config_dir = self.project_dir / "Config"
-        self.db.save(config_dir)
+        backup_dir = self.db.save(config_dir)
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Information)
+        box.setWindowTitle("Save Successful")
+        box.setText("Configuration saved successfully.")
+        box.setInformativeText(f"Backups stored in:\n{backup_dir}")
+        open_btn = box.addButton("Open Backup Folder", QMessageBox.ActionRole)
+        box.addButton(QMessageBox.Ok)
+        box.exec()
+        if box.clickedButton() == open_btn:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(backup_dir)))
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         save_settings({"main_geometry": self.saveGeometry().data().hex()})
