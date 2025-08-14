@@ -126,10 +126,12 @@ class ConfigDB:
                 return idx
         return -1
 
-    def save(self, config_dir: Path) -> None:
+    def save(self, config_dir: Path) -> Path:
+        """Write active config files and return the backup directory used."""
         backup_dir = config_dir / "Backup" / datetime.now().strftime("%Y-%m-%d-%H%M%S")
         for ini in self._active_files():
             ini.write(backup_dir)
+        return backup_dir
 
     def validate(self) -> Tuple[bool, str | None]:
         """Check for duplicates and basic syntax issues."""
