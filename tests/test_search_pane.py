@@ -22,4 +22,7 @@ def test_search_pane_uses_local_engine(tmp_path, monkeypatch):
     monkeypatch.setattr("ue_configurator.ui.search_pane.build_cache", fake_build_cache)
     cache_file = tmp_path / "cache.json"
     pane = SearchPane(cache_file, project_dir, use_local_engine=True)
+    if pane._thread is not None:
+        pane._thread.wait()
+        app.processEvents()
     assert captured["engine_root"] == engine_root
