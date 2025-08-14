@@ -5,18 +5,47 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Dict
 
+from PySide6.QtCore import Qt, QSortFilterProxyModel
+from PySide6.QtGui import QStandardItemModel, QStandardItem
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QLineEdit,
     QComboBox,
-    QTableWidget,
-    QTableWidgetItem,
+    QTableView,
     QHeaderView,
 )
 
 import rich.progress
 from ..indexer import load_cache, build_cache, detect_engine_from_uproject
+
+
+class SearchFilterProxyModel(QSortFilterProxyModel):
+    """Proxy model handling text and category filtering."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._text: str = ""
+        self._category: str = "All"
+
+    def set_text_filter(self, text: str) -> None:
+        self._text = text.lower()
+        self.invalidateFilter()
+
+    def set_category_filter(self, category: str) -> None:
+        self._category = category
+        self.invalidateFilter()
+
+    def filterAcceptsRow(self, source_row: int, source_parent) -> bool:  # type: ignore[override]
+        model = self.sourceModel()
+        name_index = model.index(source_row, 0, source_parent)
+        desc_index = model.index(source_row, 1, source_parent)
+        name = (name_index.data() or "").lower()
+        desc = (desc_index.data() or "").lower()
+        category = name_index.data(Qt.UserRole) or ""
+        text_match = self._text in name or self._text in desc
+        category_match = self._category == "All" or category == self._category
+        return text_match and category_match
 
 
 class SearchPane(QWidget):
@@ -37,8 +66,17 @@ class SearchPane(QWidget):
         self.search_box = QLineEdit()
         self.category_box = QComboBox()
         self.category_box.addItem("All")
-        self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["Name", "Description", "File"])
+
+        self.model = QStandardItemModel(0, 3, self)
+        self.model.setHorizontalHeaderLabels(["Name", "Description", "File"])
+
+        self.proxy_model = SearchFilterProxyModel(self)
+        self.proxy_model.setSourceModel(self.model)
+        self.proxy_model.setSortCaseSensitivity(Qt.CaseInsensitive)
+
+        self.table = QTableView()
+        self.table.setModel(self.proxy_model)
+        self.table.setSortingEnabled(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         layout = QVBoxLayout(self)
@@ -91,20 +129,19 @@ class SearchPane(QWidget):
             if self.category_box.findText(cat) == -1:
                 self.category_box.addItem(cat)
 
-    def update_filter(self, text: str) -> None:
-        category = self.category_box.currentText()
-        filtered = []
-        for d in self.data:
-            if text.lower() in d["name"].lower() or text.lower() in d["description"].lower():
-                if category == "All" or d.get("category", "") == category:
-                    filtered.append(d)
-        self.update_table(filtered)
+    def update_filter(self, _text: str = "") -> None:
+        """Update proxy model filters based on search text and category."""
+        self.proxy_model.set_text_filter(self.search_box.text())
+        self.proxy_model.set_category_filter(self.category_box.currentText())
 
     def update_table(self, items: List[Dict[str, str]] | None = None) -> None:
         items = items if items is not None else self.data
-        self.table.setRowCount(len(items))
-        for row, item in enumerate(items):
-            self.table.setItem(row, 0, QTableWidgetItem(item["name"]))
-            self.table.setItem(row, 1, QTableWidgetItem(item["description"]))
-            self.table.setItem(row, 2, QTableWidgetItem(item.get("file", "")))
+        self.model.setRowCount(0)
+        for item in items:
+            name = QStandardItem(item["name"])
+            # Store category in the first column for filtering
+            name.setData(item.get("category", ""), Qt.UserRole)
+            desc = QStandardItem(item["description"])
+            file_item = QStandardItem(item.get("file", ""))
+            self.model.appendRow([name, desc, file_item])
         self.table.resizeRowsToContents()
