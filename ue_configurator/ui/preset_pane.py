@@ -13,7 +13,10 @@ from PySide6.QtWidgets import (
     QPushButton,
     QFileDialog,
     QMessageBox,
+    QInputDialog,
+    QMenu,
 )
+from PySide6.QtCore import Qt
 
 
 from ..config_db import ConfigDB
@@ -27,6 +30,8 @@ class PresetPane(QWidget):
         self.setWindowTitle("Presets")
 
         self.list = QListWidget()
+        self.list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.list.customContextMenuRequested.connect(self._show_context_menu)
         self.import_btn = QPushButton("Import")
         self.export_btn = QPushButton("Export Current")
 
@@ -76,4 +81,54 @@ class PresetPane(QWidget):
                 self.db.export_preset(Path(path))
         except Exception:
             logging.exception("Failed to export preset")
+
+    def _show_context_menu(self, pos) -> None:
+        item = self.list.itemAt(pos)
+        if not item:
+            return
+        menu = QMenu(self)
+        rename_act = menu.addAction("Rename")
+        delete_act = menu.addAction("Delete")
+        action = menu.exec(self.list.mapToGlobal(pos))
+        if action == rename_act:
+            self._rename_preset(item)
+        elif action == delete_act:
+            self._delete_preset(item)
+
+    def _delete_preset(self, item) -> None:
+        name = item.text()
+        path = self.presets_dir / name
+        confirm = QMessageBox.question(
+            self,
+            "Delete Preset",
+            f"Delete {name}?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if confirm == QMessageBox.Yes:
+            try:
+                path.unlink()
+                self.load_presets()
+            except Exception:
+                logging.exception("Failed to delete preset")
+                QMessageBox.warning(
+                    self, "Delete Failed", f"Could not delete {name}"
+                )
+
+    def _rename_preset(self, item) -> None:
+        old_name = item.text()
+        old_path = self.presets_dir / old_name
+        new_name, ok = QInputDialog.getText(
+            self, "Rename Preset", "New name:", text=old_name
+        )
+        if ok and new_name and new_name != old_name:
+            new_path = self.presets_dir / new_name
+            try:
+                old_path.rename(new_path)
+                self.load_presets()
+            except Exception:
+                logging.exception("Failed to rename preset")
+                QMessageBox.warning(
+                    self, "Rename Failed", f"Could not rename {old_name}"
+                )
 
