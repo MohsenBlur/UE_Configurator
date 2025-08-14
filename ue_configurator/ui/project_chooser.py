@@ -10,7 +10,9 @@ from PySide6.QtWidgets import (
     QPushButton,
     QFileDialog,
     QCheckBox,
+    QMenu,
 )
+from PySide6.QtCore import Qt
 
 from .main_window import MainWindow
 from ..settings import load_settings, save_settings
@@ -52,6 +54,8 @@ class ProjectChooser(QWidget):
 
         self.browse_btn.clicked.connect(self.browse)
         self.recent.itemDoubleClicked.connect(self.open_recent)
+        self.recent.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.recent.customContextMenuRequested.connect(self._recent_menu)
 
         self._load()
 
@@ -61,6 +65,19 @@ class ProjectChooser(QWidget):
     def _load(self) -> None:
         for proj in load_recent():
             self.recent.addItem(proj)
+
+    def _recent_menu(self, pos) -> None:
+        item = self.recent.itemAt(pos)
+        if not item:
+            return
+        menu = QMenu(self.recent)
+        remove_action = menu.addAction("Remove")
+        action = menu.exec(self.recent.mapToGlobal(pos))
+        if action == remove_action:
+            row = self.recent.row(item)
+            self.recent.takeItem(row)
+            projects = [self.recent.item(i).text() for i in range(self.recent.count())]
+            save_recent(projects)
 
     def browse(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Select .uproject", "", "Unreal Project (*.uproject)")
