@@ -154,12 +154,20 @@ def index_headers(root: Path, progress: rich.progress.Progress | None = None) ->
     return results
 
 
+def _cache_with_version(cache_file: Path, version: str) -> Path:
+    """Return ``cache_file`` with ``-<version>`` inserted before the suffix."""
+    suffix = f"-{version}"
+    if cache_file.stem.endswith(suffix):
+        return cache_file
+    return cache_file.with_name(f"{cache_file.stem}{suffix}{cache_file.suffix}")
+
+
 def build_cache(
     cache_file: Path,
     engine_root: Path | None = None,
     version: str = "5.4",
     progress: rich.progress.Progress | None = None,
-) -> None:
+) -> Path:
     """Build a cache of console variables.
 
     Parameters
@@ -173,6 +181,14 @@ def build_cache(
         Engine version to scrape when ``engine_root`` is ``None``.
     """
 
+    target = _cache_with_version(cache_file, version)
+    if cache_file.exists() and cache_file != target:
+        print("Warning: removing outdated cache without version suffix")
+        try:
+            cache_file.unlink()
+        except OSError:
+            pass
+
     if engine_root:
         data = index_headers(engine_root, progress)
     else:
@@ -183,13 +199,24 @@ def build_cache(
             # empty cache instead and allow the caller to continue.
             print(f"Warning: unable to build online cache: {exc}")
             data = []
-    cache_file.write_text(json.dumps(data, indent=2))
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(data, indent=2))
+    return target
 
 
-def load_cache(cache_file: Path) -> List[Dict[str, str]]:
-    if cache_file.exists():
+def load_cache(cache_file: Path, version: str | None = None) -> List[Dict[str, str]]:
+    target = cache_file
+    if version:
+        target = _cache_with_version(cache_file, version)
+        if not target.exists() and cache_file.exists():
+            print(
+                "Warning: cache file without version suffix detected; "
+                "consider rebuilding"
+            )
+            target = cache_file
+    if target.exists():
         try:
-            return json.loads(cache_file.read_text())
+            return json.loads(target.read_text())
         except Exception:
             pass
     return []
@@ -203,6 +230,21 @@ def detect_engine_from_uproject(project_dir: Path) -> Path | None:
             assoc = data.get("EngineAssociation")
             if assoc and Path(assoc).exists():
                 return Path(assoc)
+        except Exception:
+            continue
+    return None
+
+
+def detect_version_from_uproject(project_dir: Path) -> str | None:
+    """Return engine version string from a project's .uproject."""
+    for up in project_dir.glob("*.uproject"):
+        try:
+            data = jsonlib.loads(up.read_text())
+            assoc = data.get("EngineAssociation") or data.get("EngineVersion")
+            if isinstance(assoc, str):
+                m = re.search(r"\d+\.\d+", assoc)
+                if m:
+                    return m.group(0)
         except Exception:
             continue
     return None
@@ -227,18 +269,30 @@ def main() -> None:
         type=Path,
         default=Path.home() / ".ue5_config_assistant" / "cvar_cache.json",
     )
+    parser.add_argument(
+        "--rebuild",
+        action="store_true",
+        help="Delete existing cache before building",
+    )
     args = parser.parse_args()
+
+    if args.rebuild:
+        for f in args.cache.parent.glob(f"{args.cache.stem}*{args.cache.suffix}"):
+            try:
+                f.unlink()
+            except OSError:
+                pass
 
     progress = rich.progress.Progress() if args.engine_root else None
     with progress or contextlib.nullcontext():
-        build_cache(
+        target = build_cache(
             cache_file=args.cache,
             engine_root=args.engine_root,
             version=args.version,
             progress=progress,
         )
 
-    print(f"Cache written to {args.cache}")
+    print(f"Cache written to {target}")
 
 
 if __name__ == "__main__":
