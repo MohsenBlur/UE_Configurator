@@ -90,7 +90,7 @@ def scrape_console_variables(version: str) -> List[Dict[str, str]]:
         # Some environments sit behind Cloudflare protection which rejects
         # generic requests. Retry with cloudscraper if available.
         if cloudscraper is None:
-            raise RuntimeError("HTTP 403 received; install 'cloudscraper' for retry")
+            raise RuntimeError("HTTP 403 received while fetching console variable reference")
         scraper = cloudscraper.create_scraper()
         resp = scraper.get(url, headers=headers, timeout=10)
     try:
