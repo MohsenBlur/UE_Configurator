@@ -35,7 +35,10 @@ class MainWindow(QMainWindow):
         self.search = SearchPane(cache_file, project_dir, use_local_engine=use_local_engine)
         self.details = DetailsPane(self.db)
 
-        self.search.table.itemSelectionChanged.connect(self.show_details)
+        # QTableView does not provide an ``itemSelectionChanged`` signal like
+        # QTableWidget.  Use the selection model's ``selectionChanged`` signal
+        # instead so that selecting rows triggers the details pane update.
+        self.search.table.selectionModel().selectionChanged.connect(self.show_details)
 
         splitter = QSplitter()
         splitter.addWidget(self.search)
@@ -72,7 +75,12 @@ class MainWindow(QMainWindow):
         if geo := settings.get("main_geometry"):
             self.restoreGeometry(bytes.fromhex(geo))
 
-    def show_details(self) -> None:
+    def show_details(self, *_args) -> None:
+        """Show details for the currently selected row.
+
+        ``selectionChanged`` emits two ``QItemSelection`` arguments which are
+        ignored; the method simply inspects the table's current selection."""
+
         rows = self.search.table.selectionModel().selectedRows()
         if not rows:
             return
